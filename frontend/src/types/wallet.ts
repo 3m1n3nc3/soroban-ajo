@@ -1,6 +1,6 @@
-// Wallet type definitions for Freighter and Albedo integration
+// Wallet type definitions for Freighter, Albedo, and Lobstr integration
 
-export type WalletType = 'freighter' | 'albedo';
+export type WalletType = 'freighter' | 'albedo' | 'lobstr';
 
 export interface WalletInfo {
     name: string;
@@ -63,11 +63,19 @@ export interface AlbedoAPI {
     trust: (params: { asset_code: string; asset_issuer: string; limit?: string }) => Promise<{ pubkey: string }>;
 }
 
+// Lobstr Vault API types (browser extension)
+export interface LobstrVaultAPI {
+    getPublicKey: () => Promise<string>;
+    signTransaction: (xdr: string, opts?: { network?: string }) => Promise<string>;
+    isConnected?: () => Promise<boolean>;
+}
+
 declare global {
     interface Window {
         freighterApi?: FreighterApi;
         // Legacy: keep this for older codepaths/extensions.
         freighter?: FreighterApi;
         albedo?: AlbedoAPI;
+        lobstrVault?: LobstrVaultAPI;
     }
 }

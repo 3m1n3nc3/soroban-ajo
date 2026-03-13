@@ -36,6 +36,11 @@ export const useWallet = () => {
                 type: 'albedo',
                 isInstalled: typeof window !== 'undefined' && !!window.albedo,
             },
+            {
+                name: 'Lobstr Vault',
+                type: 'lobstr',
+                isInstalled: typeof window !== 'undefined' && !!window.lobstrVault,
+            },
         ];
         return wallets;
     }, []);

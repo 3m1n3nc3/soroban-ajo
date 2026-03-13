@@ -12,6 +12,11 @@ import {
   getStellarNetworkFromFreighter,
   waitForFreighterApi,
 } from '@/utils/freighter'
+import {
+  connectLobstrVault,
+  isMobileDevice,
+  isValidStellarAddress as validateLobstrAddress,
+} from '@/utils/lobstr'
 
 const DEFAULT_CONFIG: SessionConfig = {
   sessionDuration: 30 * 60 * 1000,
@@ -208,6 +213,44 @@ class AuthService {
         }
 
         return { address, signature, network }
+      }
+
+      case 'lobstr': {
+        // Lobstr wallet support
+        if (isMobileDevice()) {
+          throw new AuthError(
+            'Lobstr mobile app authentication requires a callback flow. Please use the "Connect with Lobstr" button which will redirect you to the Lobstr app.',
+            'MOBILE_FLOW_REQUIRED',
+          )
+        }
+        
+        // Desktop: Try Lobstr Vault extension
+        try {
+          const result = await connectLobstrVault()
+          
+          if (!validateLobstrAddress(result.address)) {
+            throw new AuthError(
+              'Invalid Stellar address returned by Lobstr Vault',
+              'INVALID_ADDRESS',
+            )
+          }
+          
+          // Use challenge as signature since Lobstr Vault doesn't support signAuthEntry
+          const signature = challenge
+          
+          return {
+            address: result.address,
+            signature,
+            network: result.network,
+          }
+        } catch (error) {
+          if (error instanceof AuthError) throw error
+          
+          throw new AuthError(
+            'Lobstr Vault extension not found. Please install Lobstr Vault from the Chrome Web Store, or use Lobstr mobile app.',
+            'WALLET_NOT_FOUND',
+          )
+        }
       }
 
       case 'albedo':
