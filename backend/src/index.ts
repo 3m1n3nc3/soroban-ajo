@@ -2,9 +2,16 @@ import dotenv from 'dotenv'
 import { errorHandler } from './middleware/errorHandler'
 import { requestLogger } from './middleware/requestLogger'
 import { logger } from './utils/logger'
-import { startWorkers, stopWorkers } from './jobs/jobWorkers'
-import { startScheduler, stopScheduler } from './cron/scheduler'
-import { kycRouter } from './routes/kyc'
+import { groupsRouter } from './routes/groups'
+import { healthRouter } from './routes/health'
+import { webhooksRouter } from './routes/webhooks'
+import { authRouter } from './routes/auth'
+import { jobsRouter } from './routes/jobs'
+import { setupSwagger } from './swagger'
+import { apiLimiter, strictLimiter } from './middleware/rateLimiter'
+// Import queue and job modules
+import { initializeQueues } from './queues'
+import { startJobProcessors } from './jobs'
 
 dotenv.config()
 
@@ -32,45 +39,22 @@ setupSwagger(app)
 
 // Routes
 app.use('/health', healthRouter)
-app.use('/api/auth', createIpLimiter('auth'), authRouter)
-app.use('/api/groups', createUserLimiter(), groupsRouter)
-app.use('/api/webhooks', createIpLimiter('auth'), webhooksRouter)
-app.use('/api/analytics', createUserLimiter(), analyticsRouter)
-app.use('/api/email', emailRouter)
-app.use('/api/jobs', jobsRouter)
-app.use('/api/gamification', createIpLimiter('expensive'), createUserLimiter(), gamificationRouter)
-app.use('/api/goals', createUserLimiter(), goalsRouter)
-app.use('/api/kyc', kycRouter)
-
-// Disputes
-import { disputesRouter } from './routes/disputes'
-app.use('/api/disputes', disputesRouter)
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Not found',
-  })
-})
+app.use('/api/auth', strictLimiter, authRouter)
+app.use('/api/groups', groupsRouter)
+app.use('/api/webhooks', strictLimiter, webhooksRouter)
+app.use('/jobs', jobsRouter)
 
 // Error handling
 app.use(errorHandler)
 
-// Start server and keep reference so we can close it on shutdown
-const server = app.listen(PORT, () => {
-  logger.info(`Server started on port ${PORT}`, { env: process.env.NODE_ENV || 'development' })
+// Initialize queues and workers
+initializeQueues()
+startJobProcessors()
 
-  // Start background job workers and cron scheduler
-  try {
-    startWorkers()
-    startScheduler()
-    logger.info('Background jobs and cron scheduler started')
-  } catch (err) {
-    logger.error('Failed to start background jobs', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-  }
+// Start server
+app.listen(PORT, () => {
+  logger.info(`Server started on port ${PORT}`, { env: process.env.NODE_ENV || 'development' })
+  logger.info('Job queue system initialized and ready')
 })
 
 // Graceful shutdown
